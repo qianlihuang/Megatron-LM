@@ -101,7 +101,46 @@ def gpt_builder(args, pre_process, post_process, vp_stage=None, config=None, pg_
             pg_collection=pg_collection,
         )
 
+        # Freeze base model if requested (only train MTP layers)
+        if getattr(args, 'freeze_base_model', False) and args.mtp_num_layers is not None:
+            _freeze_base_model(model)
+            print_rank_0('Frozen base model - only MTP layers will be trained')
+
     return model
+
+
+def _freeze_base_model(model):
+    """Freeze base model weights, only keep MTP layers trainable.
+    
+    This freezes:
+    - Embedding layer
+    - All decoder/transformer layers
+    - Output layer
+    
+    Only MTP layers remain trainable.
+    """
+    # Freeze embedding
+    if hasattr(model, 'embedding') and model.embedding is not None:
+        for param in model.embedding.parameters():
+            param.requires_grad = False
+    
+    # Freeze decoder (transformer layers)
+    if hasattr(model, 'decoder') and model.decoder is not None:
+        for param in model.decoder.parameters():
+            param.requires_grad = False
+    
+    # Freeze output layer
+    if hasattr(model, 'output_layer') and model.output_layer is not None:
+        for param in model.output_layer.parameters():
+            param.requires_grad = False
+    
+    # Freeze rotary position embedding
+    if hasattr(model, 'rotary_pos_emb') and model.rotary_pos_emb is not None:
+        for param in model.rotary_pos_emb.parameters():
+            param.requires_grad = False
+    
+    # MTP layers should remain trainable (don't freeze)
+    # The model.mtp module is not frozen
 
 
 def _get_transformer_layer_spec(use_te, config):

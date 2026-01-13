@@ -1,0 +1,39 @@
+Sample Verification
+============================================================
+
+=== Sample 1 ===
+Original: {'text': 'Human: What is the capital of France?\nAssistant: The capital of France is Paris. Paris is not only the capital but also the largest city in France, known for its iconic landmarks such as the Eiffel Tower, the Louvre Museum, and Notre-Dame Cathedral.'}
+
+Tokens (55): [34248, 28, 1999, 344, 270, 6102, 294, 8760, 2755, 88031, 28, 455, 6102, 294, 8760, 344, 11111, 16, 11111, 344, 554, 1353, 270, 6102, 790, 990, 270, 9152, 4593, 295, 8760, 14, 3459, 362, 1009, 32380, 63554, 1345, 412, 270, 446, 4280, 317, 36788, 14, 270, 125089, 13924, 14, 305]...
+
+Decoded:
+Human: What is the capital of France?
+Assistant: The capital of France is Paris. Paris is not only the capital but also the largest city in France, known for its iconic landmarks such as the Eiffel Tower, the Louvre Museum, and Notre-Dame Cathedral....
+
+------------------------------------------------------------
+
+=== Sample 2 ===
+Original: {'text': 'Human: Explain quantum computing in simple terms.\nAssistant: Quantum computing is a type of computing that uses quantum mechanics to process information. Unlike classical computers that use bits (0s and 1s), quantum computers use quantum bits or qubits, which can exist in multiple states simultaneously through a phenomenon called superposition.'}
+
+Tokens (62): [34248, 28, 28231, 17090, 17117, 295, 4654, 3999, 603, 88031, 28, 42497, 17117, 344, 260, 2613, 294, 17117, 396, 6623, 17090, 29821, 304, 1699, 1951, 16, 27188, 17765, 19578, 396, 1347, 16604, 343, 18, 85, 305, 223, 19, 85, 754, 17090, 19578, 1347, 17090, 16604, 469, 645, 22732, 14, 778]...
+
+Decoded:
+Human: Explain quantum computing in simple terms.
+Assistant: Quantum computing is a type of computing that uses quantum mechanics to process information. Unlike classical computers that use bits (0s and 1s), quantum computers use quantum bits or qubits, which can exist in multiple states simultaneously through a phenomenon called superposition....
+
+------------------------------------------------------------
+
+=== Sample 3 ===
+Original: {'text': 'Human: Write a short poem about the moon.\nAssistant: Silver orb in midnight sky,\nWatching as the hours fly,\nCasting shadows, soft and bright,\nGuardian of the peaceful night.'}
+
+Tokens (40): [34248, 28, 15361, 260, 3107, 17261, 943, 270, 17408, 603, 88031, 28, 25686, 29945, 295, 44844, 12709, 989, 57, 19468, 412, 270, 4343, 14906, 989, 37, 19752, 37629, 14, 4500, 305, 11533, 989, 63526, 976, 294, 270, 29777, 4666, 16]...
+
+Decoded:
+Human: Write a short poem about the moon.
+Assistant: Silver orb in midnight sky,
+Watching as the hours fly,
+Casting shadows, soft and bright,
+Guardian of the peaceful night....
+
+------------------------------------------------------------
+

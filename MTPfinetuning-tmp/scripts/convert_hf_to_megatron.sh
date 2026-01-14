@@ -1,13 +1,13 @@
 #!/bin/bash
 # =============================================================================
-# DeepSeek-V3.2 MTP 训练 - 简单版 (TP=16, 2节点)
+# DeepSeek-V3.2 HuggingFace -> Megatron Checkpoint 转换
 # =============================================================================
 #
-# 使用 TP=16 在 2 个节点上训练，每节点 8 GPU
-# 通过 ModelOpt 直接加载 HuggingFace checkpoint
+# 将 HuggingFace checkpoint 转换为 Megatron 格式
+# 需要在 **2 节点 16 GPU** 上运行 (每节点 8 GPU)
 #
-# 节点0: NNODES=2 NODE_RANK=0 MASTER_ADDR=<node0_ip> bash train_simple_tp16.sh
-# 节点1: NNODES=2 NODE_RANK=1 MASTER_ADDR=<node0_ip> bash train_simple_tp16.sh
+# 节点0: NNODES=2 NODE_RANK=0 MASTER_ADDR=<node0_ip> bash convert_hf_to_megatron.sh
+# 节点1: NNODES=2 NODE_RANK=1 MASTER_ADDR=<node0_ip> bash convert_hf_to_megatron.sh
 #
 # =============================================================================
 
@@ -17,16 +17,14 @@ set -e
 export CUDA_DEVICE_MAX_CONNECTIONS=1
 export NVTE_FUSED_ATTN=1
 export PYTHONWARNINGS=ignore
-export NCCL_DEBUG=INFO
 export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
 export TOKENIZERS_PARALLELISM=false
+export NCCL_DEBUG=INFO
 
 # 路径配置
 MEGATRON_PATH="/workspace/Megatron-LM"
 HF_MODEL_PATH="/data/models/DeepSeek-V3.2"
-MEGATRON_CHECKPOINT="/data/models/DeepSeek-V3.2-megatron-tp16/release"
-OUTPUT_DIR="/data/finetuned_mtp_v32"
-DATA_PATH="/workspace/Megatron-LM/MTPfinetuning-tmp/data/processed/train_text_document"
+CONVERTED_OUTPUT="/data/models/DeepSeek-V3.2-megatron-tp16"
 
 # 分布式配置
 GPUS_PER_NODE=8
@@ -35,7 +33,7 @@ NODE_RANK=${NODE_RANK:-0}
 MASTER_ADDR=${MASTER_ADDR:-localhost}
 MASTER_PORT=${MASTER_PORT:-6000}
 
-# 并行策略
+# 并行策略 (需要和训练脚本一致)
 TP=16
 PP=1
 EP=1
@@ -43,11 +41,14 @@ EP=1
 WORLD_SIZE=$((GPUS_PER_NODE * NNODES))
 
 echo "==================================================================="
-echo "DeepSeek-V3.2 MTP 训练 (TP=$TP, PP=$PP, EP=$EP)"
+echo "转换 DeepSeek-V3.2 HuggingFace -> Megatron 格式"
 echo "==================================================================="
 echo "节点: $NODE_RANK / $NNODES"
 echo "Master: $MASTER_ADDR:$MASTER_PORT"
 echo "World Size: $WORLD_SIZE"
+echo "HuggingFace 模型路径: $HF_MODEL_PATH"
+echo "输出路径: $CONVERTED_OUTPUT"
+echo "TP: $TP, PP: $PP, EP: $EP"
 echo "==================================================================="
 
 DISTRIBUTED_ARGS="
@@ -101,7 +102,6 @@ MOE_ARGS="
     --moe-shared-expert-intermediate-size 2048 \
     --moe-router-topk 8 \
     --moe-router-load-balancing-type seq_aux_loss \
-    --moe-grouped-gemm \
     --moe-aux-loss-coeff 0.0 \
     --moe-router-group-topk 4 \
     --moe-router-num-groups 8 \
@@ -112,11 +112,10 @@ MOE_ARGS="
     --moe-router-dtype fp32
 "
 
-# MTP 参数 - 冻结基础模型只训练MTP层
+# MTP 参数
 MTP_ARGS="
     --mtp-num-layers 1 \
-    --mtp-loss-scaling-factor 1.0 \
-    --freeze-base-model
+    --mtp-loss-scaling-factor 1.0
 "
 
 # 并行参数
@@ -128,75 +127,37 @@ PARALLEL_ARGS="
     --use-distributed-optimizer
 "
 
-# 训练参数
-TRAINING_ARGS="
-    --micro-batch-size 1 \
-    --global-batch-size 16 \
-    --train-iters 100 \
-    --lr 1e-5 \
-    --min-lr 1e-6 \
-    --lr-decay-style cosine \
-    --lr-warmup-iters 10 \
-    --weight-decay 0.1 \
-    --clip-grad 1.0 \
-    --adam-beta1 0.9 \
-    --adam-beta2 0.95 \
-    --bf16
-"
-
-# 数据参数 - 使用真实数据
-DATA_ARGS="
+# 转换参数
+CONVERT_ARGS="
+    --pretrained-model-path $HF_MODEL_PATH \
     --tokenizer-type HuggingFaceTokenizer \
     --tokenizer-model $HF_MODEL_PATH \
-    --data-path $DATA_PATH
-"
-
-# Checkpoint 参数 - 加载转换后的 Megatron checkpoint
-CHECKPOINT_ARGS="
-    --load $MEGATRON_CHECKPOINT \
-    --save $OUTPUT_DIR \
-    --save-interval 50 \
+    --save $CONVERTED_OUTPUT \
+    --save-interval 1 \
+    --use-mcore-models \
+    --bf16 \
+    --init-model-with-meta-device \
     --no-load-optim \
     --no-load-rng \
-    --finetune
+    --micro-batch-size 1 \
+    --global-batch-size 1
 "
 
-# 日志参数
-LOGGING_ARGS="
-    --log-interval 1 \
-    --log-throughput \
-    --eval-interval 100000 \
-    --eval-iters 0
-"
-
-# 其他参数
-OTHER_ARGS="
-    --use-mcore-models \
-    --no-create-attention-mask-in-dataloader \
-    --recompute-granularity selective \
-    --recompute-modules moe_act mlp \
-    --manual-gc \
-    --manual-gc-interval 10
-"
-
-mkdir -p $OUTPUT_DIR
+mkdir -p $CONVERTED_OUTPUT
 
 cd $MEGATRON_PATH
 
-# 运行训练
+# 运行转换
 torchrun $DISTRIBUTED_ARGS \
-    pretrain_gpt.py \
+    examples/post_training/modelopt/convert_model.py \
     $MODEL_ARGS \
     $MLA_ARGS \
     $MOE_ARGS \
     $MTP_ARGS \
     $PARALLEL_ARGS \
-    $TRAINING_ARGS \
-    $DATA_ARGS \
-    $CHECKPOINT_ARGS \
-    $LOGGING_ARGS \
-    $OTHER_ARGS
+    $CONVERT_ARGS
 
 echo "==================================================================="
-echo "训练完成!"
+echo "转换完成！"
+echo "Megatron checkpoint 保存在: $CONVERTED_OUTPUT"
 echo "==================================================================="
